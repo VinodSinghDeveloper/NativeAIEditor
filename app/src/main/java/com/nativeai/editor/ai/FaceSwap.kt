@@ -143,28 +143,38 @@ object FaceSwap {
   }
 
   private fun colorMatch(fake: Bitmap, target: Bitmap): Bitmap {
-    val f = fake.pixels(); val t = target.pixels()
-    val mf = FloatArray(3); val mt = FloatArray(3); val sf = FloatArray(3); val st = FloatArray(3)
+    val f = fake.pixels()
+    val t = target.pixels()
+    var mfR = 0f; var mfG = 0f; var mfB = 0f
+    var mtR = 0f; var mtG = 0f; var mtB = 0f
     val n = f.size.toFloat()
-    for (p in f) { mf[0] += ((p ushr 16) and 255); mf[1] += ((p ushr 8) and 255); mf[2] += (p and 255) }
-    for (p in t) { mt[0] += ((p ushr 16) and 255); mt[1] += ((p ushr 8) and 255); mt[2] += (p and 255) }
-    for (c in 0..2) { mf[c] /= n; mt[c] /= n }
+    for (p in f) { mfR += (p ushr 16) and 255; mfG += (p ushr 8) and 255; mfB += p and 255 }
+    for (p in t) { mtR += (p ushr 16) and 255; mtG += (p ushr 8) and 255; mtB += p and 255 }
+    mfR /= n; mfG /= n; mfB /= n
+    mtR /= n; mtG /= n; mtB /= n
+    var sfR = 0f; var sfG = 0f; var sfB = 0f
+    var stR = 0f; var stG = 0f; var stB = 0f
     for (p in f) {
-      val d0 = ((p ushr 16) and 255) - mf[0]; val d1 = ((p ushr 8) and 255) - mf[1]; val d2 = (p and 255) - mf[2]
-      sf[0] += d0 * d0; sf[1] += d1 * d1; sf[2] += d2 * d2
+      val d0 = ((p ushr 16) and 255) - mfR
+      val d1 = ((p ushr 8) and 255) - mfG
+      val d2 = (p and 255) - mfB
+      sfR += d0 * d0; sfG += d1 * d1; sfB += d2 * d2
     }
     for (p in t) {
-      val d0 = ((p ushr 16) and 255) - mt[0]; val d1 = ((p ushr 8) and 255) - mt[1]; val d2 = (p and 255) - mt[2]
-      st[0] += d0 * d0; st[1] += d1 * d1; st[2] += d2 * d2
+      val d0 = ((p ushr 16) and 255) - mtR
+      val d1 = ((p ushr 8) and 255) - mtG
+      val d2 = (p and 255) - mtB
+      stR += d0 * d0; stG += d1 * d1; stB += d2 * d2
     }
-    for (c in 0..2) { sf[c] = sqrt(sf[c] / n) + 1e-3f; st[c] = sqrt(st[c] / n) + 1e-3f }
+    sfR = sqrt(sfR / n) + 1e-3f; sfG = sqrt(sfG / n) + 1e-3f; sfB = sqrt(sfB / n) + 1e-3f
+    stR = sqrt(stR / n) + 1e-3f; stG = sqrt(stG / n) + 1e-3f; stB = sqrt(stB / n) + 1e-3f
     val out = IntArray(f.size)
     for (i in f.indices) {
-      val p = f[i]
-      val r = clampI((((p ushr 16) and 255) - mf[0]) * (st[0] / sf[0]) + mt[0])
-      val g = clampI((((p ushr 8) and 255) - mf[1]) * (st[1] / sf[1]) + mt[1])
-      val b = clampI(((p and 255) - mf[2]) * (st[2] / sf[2]) + mt[2])
-      out[i] = (255 shl 24) or (r shl 16) or (g shl 8) or b
+      val p = f.get(i)
+      val r = clampI((((p ushr 16) and 255) - mfR) * (stR / sfR) + mtR)
+      val g = clampI((((p ushr 8) and 255) - mfG) * (stG / sfG) + mtG)
+      val b = clampI(((p and 255) - mfB) * (stB / sfB) + mtB)
+      out.set(i, (255 shl 24) or (r shl 16) or (g shl 8) or b)
     }
     return intsToBitmap(out, fake.width, fake.height)
   }
