@@ -89,7 +89,7 @@ object Style {
     val bCh = ArrayList<Mat>(); val tCh = ArrayList<Mat>()
     Core.split(baseLab, bCh); Core.split(texLab, tCh)
     val lB = ByteArray(w * h); val lT = ByteArray(w * h)
-    bCh[0].get(0, 0, lB); tCh[0].get(0, lT)
+    bCh[0].get(0, 0, lB); tCh[0].get(0, 0, lT)
 
     val s = clampF(strength)
     for (i in 0 until w * h) {

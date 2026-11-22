@@ -90,7 +90,7 @@ object SdTurbo {
     maskFull.put(0, 0, alpha)
     val maskCrop = Mat(maskFull, org.opencv.core.Rect(bbox.left, bbox.top, bbox.width(), bbox.height()))
     val maskSq = Mat()
-    Imgproc.copyMakeBorder(maskCrop, maskSq, 0, side - bbox.height(), 0, side - bbox.width(), org.opencv.core.Core.BORDER_CONSTANT, org.opencv.core.Scalar(0.0))
+    org.opencv.core.Core.copyMakeBorder(maskCrop, maskSq, 0, side - bbox.height(), 0, side - bbox.width(), org.opencv.core.Core.BORDER_CONSTANT, org.opencv.core.Scalar(0.0))
     Imgproc.resize(maskSq, maskMat, Size(64.0, 64.0))
     Imgproc.GaussianBlur(maskMat, maskMat, Size(5.0, 5.0), 1.5)
     val lm = FloatArray(64 * 64)

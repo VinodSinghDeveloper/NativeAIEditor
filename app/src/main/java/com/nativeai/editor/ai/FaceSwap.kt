@@ -164,7 +164,7 @@ object FaceSwap {
   }
 
   private fun paste(base: Bitmap, faceBmp: Bitmap, m: Mat, feather: Float): Bitmap {
-    val inv = Mat(); org.opencv.core.Core.invertAffineTransform(m, inv)
+    val inv = Mat(); org.opencv.imgproc.Imgproc.invertAffineTransform(m, inv)
     val faceMat = faceBmp.toMat()
     val warped = Mat()
     Imgproc.warpAffine(faceMat, warped, inv, Size(base.width.toDouble(), base.height.toDouble()), Imgproc.INTER_LINEAR, org.opencv.core.Core.BORDER_CONSTANT, Scalar(0.0))
