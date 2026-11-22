@@ -114,7 +114,7 @@ object FaceSwap {
   private fun warp(src: Bitmap, m: Mat, size: Int): Bitmap {
     val inMat = src.toMat()
     val out = Mat()
-    Imgproc.warpAffine(inMat, out, m, Size(size.toDouble(), size.toDouble()), Imgproc.INTER_LINEAR, org.opencv.core.Core.BORDER_REFLECT_101, Scalar())
+    Imgproc.warpAffine(inMat, out, m, Size(size.toDouble(), size.toDouble()), Imgproc.INTER_LINEAR, org.opencv.core.Core.BORDER_REFLECT_101, Scalar(0.0))
     inMat.release()
     val b = out.toBitmap(); out.release()
     return b
@@ -164,10 +164,10 @@ object FaceSwap {
   }
 
   private fun paste(base: Bitmap, faceBmp: Bitmap, m: Mat, feather: Float): Bitmap {
-    val inv = org.opencv.core.Core.invertAffineTransform(m)
+    val inv = Mat(); org.opencv.core.Core.invertAffineTransform(m, inv)
     val faceMat = faceBmp.toMat()
     val warped = Mat()
-    Imgproc.warpAffine(faceMat, warped, inv, Size(base.width.toDouble(), base.height.toDouble()), Imgproc.INTER_LINEAR, org.opencv.core.Core.BORDER_CONSTANT, Scalar())
+    Imgproc.warpAffine(faceMat, warped, inv, Size(base.width.toDouble(), base.height.toDouble()), Imgproc.INTER_LINEAR, org.opencv.core.Core.BORDER_CONSTANT, Scalar(0.0))
     val maskSrc = Mat(faceBmp.height, faceBmp.width, CvType.CV_8UC1, Scalar(255.0))
     val maskW = Mat()
     Imgproc.warpAffine(maskSrc, maskW, inv, Size(base.width.toDouble(), base.height.toDouble()), Imgproc.INTER_LINEAR, org.opencv.core.Core.BORDER_CONSTANT, Scalar(0.0))
