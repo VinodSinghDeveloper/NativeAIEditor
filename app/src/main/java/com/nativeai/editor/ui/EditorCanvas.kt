@@ -103,7 +103,7 @@ fun EditorCanvas(
               if (drawing) { onStrokeEnd(); drawing = false }
             }
             val centroid = event.calculateCentroid() ?: changes[0].position
-            val dist = event.calculateCentroidSize(useCurrent = false)
+            val dist = event.calculateCentroidSize(false)
             if ((centroid - start).getDistance() > 12f) moved = true
 
             when {
