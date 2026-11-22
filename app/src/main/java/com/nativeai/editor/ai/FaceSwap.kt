@@ -145,15 +145,21 @@ object FaceSwap {
   private fun colorMatch(fake: Bitmap, target: Bitmap): Bitmap {
     val f = fake.pixels(); val t = target.pixels()
     val mf = FloatArray(3); val mt = FloatArray(3); val sf = FloatArray(3); val st = FloatArray(3)
-    val n = f.size
-    for (p in f) { mf[0] += (p ushr 16) and 255; mf[1] += (p ushr 8) and 255; mf[2] += p and 255 }
-    for (p in t) { mt[0] += (p ushr 16) and 255; mt[1] += (p ushr 8) and 255; mt[2] += p and 255 }
+    val n = f.size.toFloat()
+    for (p in f) { mf[0] += ((p ushr 16) and 255); mf[1] += ((p ushr 8) and 255); mf[2] += (p and 255) }
+    for (p in t) { mt[0] += ((p ushr 16) and 255); mt[1] += ((p ushr 8) and 255); mt[2] += (p and 255) }
     for (c in 0..2) { mf[c] /= n; mt[c] /= n }
-    for (p in f) { val d = floatArrayOf(((p ushr 16) and 255) - mf[0], ((p ushr 8) and 255) - mf[1], (p and 255) - mf[2]); for (c in 0..2) sf[c] += d[c] * d[c] }
-    for (p in t) { val d = floatArrayOf(((p ushr 16) and 255) - mt[0], ((p ushr 8) and 255) - mt[1], (p and 255) - mt[2]); for (c in 0..2) st[c] += d[c] * d[c] }
+    for (p in f) {
+      val d0 = ((p ushr 16) and 255) - mf[0]; val d1 = ((p ushr 8) and 255) - mf[1]; val d2 = (p and 255) - mf[2]
+      sf[0] += d0 * d0; sf[1] += d1 * d1; sf[2] += d2 * d2
+    }
+    for (p in t) {
+      val d0 = ((p ushr 16) and 255) - mt[0]; val d1 = ((p ushr 8) and 255) - mt[1]; val d2 = (p and 255) - mt[2]
+      st[0] += d0 * d0; st[1] += d1 * d1; st[2] += d2 * d2
+    }
     for (c in 0..2) { sf[c] = sqrt(sf[c] / n) + 1e-3f; st[c] = sqrt(st[c] / n) + 1e-3f }
-    val out = IntArray(n)
-    for (i in 0 until n) {
+    val out = IntArray(f.size)
+    for (i in f.indices) {
       val p = f[i]
       val r = clampI((((p ushr 16) and 255) - mf[0]) * (st[0] / sf[0]) + mt[0])
       val g = clampI((((p ushr 8) and 255) - mf[1]) * (st[1] / sf[1]) + mt[1])
