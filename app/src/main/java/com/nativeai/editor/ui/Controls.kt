@@ -18,7 +18,7 @@ fun SliderRow(label: String, value: Float, range: ClosedFloatingPointRange<Float
 }
 
 @Composable
-fun Chip(selected: Boolean, label: String, onClick: () -> Unit, enabled: Boolean = true) {
+fun Chip(selected: Boolean, label: String, enabled: Boolean = true, onClick: () -> Unit) {
   if (selected) {
     Button(onClick = onClick, enabled = enabled, contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp), modifier = Modifier.padding(2.dp)) { Text(label, fontSize = 12.sp) }
   } else {
