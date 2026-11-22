@@ -1,5 +1,6 @@
 package com.nativeai.editor.ai
 
+import ai.onnxruntime.OnnxJavaType
 import ai.onnxruntime.OnnxTensor
 import ai.onnxruntime.OrtEnvironment
 import ai.onnxruntime.OrtSession
@@ -32,7 +33,7 @@ object Ort {
 
   fun tensorFor(session: OrtSession, name: String, data: FloatArray, shape: LongArray): OnnxTensor {
     val ti = session.inputInfo[name]?.info as? TensorInfo
-    return if (ti != null && ti.type == TensorInfo.OnnxTensorType.ONNX_TENSOR_ELEMENT_DATA_TYPE_INT64)
+    return if (ti != null && ti.type == OnnxJavaType.INT64)
       lTensor(shape, LongArray(data.size) { data[it].toLong() })
     else fTensor(shape, data)
   }
