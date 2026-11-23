@@ -15,12 +15,12 @@ data class ModelDef(
 object ModelCatalog {
   // Community mirrors are best-effort; every model also supports local import / custom URL.
   val all = listOf(
-        ModelDef("anime_hayao", "AnimeGANv3 Hayao (Anime Art)", "animeganv3_hayao.onnx", 9,
-      listOf("https://huggingface.co/vumichien/AnimeGANv3_Hayao_36/resolve/main/AnimeGANv3_Hayao_36.onnx")),
-    ModelDef("anime_shinkai", "AnimeGANv3 Shinkai (3D/Cinema Art)", "animeganv3_shinkai.onnx", 9,
-      listOf("https://huggingface.co/vumichien/AnimeGANv3_Shinkai_53/resolve/main/AnimeGANv3_Shinkai_53.onnx")),
-    ModelDef("colorizer", "B&W Photo Colorizer ONNX", "colorizer.onnx", 45,
-      listOf("https://huggingface.co/nicolalandro/ddcolor/resolve/main/ddcolor_modelscope.onnx")),
+        ModelDef("anime_hayao", "AnimeGANv3 Hayao (Anime Art)", "animeganv3_hayao.onnx",
+      listOf("https://huggingface.co/vumichien/AnimeGANv3_Hayao_36/resolve/main/AnimeGANv3_Hayao_36.onnx"), 9),
+    ModelDef("anime_shinkai", "AnimeGANv3 Shinkai (3D/Cinema Art)", "animeganv3_shinkai.onnx",
+      listOf("https://huggingface.co/vumichien/AnimeGANv3_Shinkai_53/resolve/main/AnimeGANv3_Shinkai_53.onnx"), 9),
+    ModelDef("colorizer", "B&W Photo Colorizer ONNX", "colorizer.onnx",
+      listOf("https://huggingface.co/nicolalandro/ddcolor/resolve/main/ddcolor_modelscope.onnx"), 45),
     ModelDef("lama", "LaMa Inpainter (lama_fp32.onnx)", "lama_fp32.onnx",
       listOf("https://huggingface.co/Carve/LaMa-ONNX/resolve/main/lama_fp32.onnx"), 208, core = true,
       note = "Magic Object Eraser. Community ONNX mirror."),

@@ -291,7 +291,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     val model = requireModel("lama") ?: return
     runOp("Magic Eraser") { progress ->
       pushUndo()
-      val out = Lama.erase(bmp, alpha, ui.maskInverted, model, progress)
+      val out = Lama.inpaint(bmp, alpha, ui.maskInverted, model, progress)
       invalidateCaches()
       withContext(Dispatchers.Main) {
         mask.eraseColor(android.graphics.Color.TRANSPARENT)
@@ -337,7 +337,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
           val eraseAlpha = if (action == 1) ByteArray(fg.size) { (255 - (fg[it].toInt() and 0xFF)).toByte() } else fg
           val lamaModel = requireModel("lama") ?: return@runOp
           pushUndo()
-          val out = Lama.erase(bmp, eraseAlpha, false, lamaModel, progress)
+          val out = Lama.inpaint(bmp, eraseAlpha, false, lamaModel, progress)
           invalidateCaches()
           withContext(Dispatchers.Main) {
             mask = alphaToMask(eraseAlpha, bmp.width, bmp.height)

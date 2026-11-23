@@ -21,10 +21,8 @@ object CreativeStudioAi {
     val sw = fixed?.second ?: max(32, ((w * scale).roundToInt() / 32) * 32)
     val sh = fixed?.first ?: max(32, ((h * scale).roundToInt() / 32) * 32)
     val scaled = Bitmap.createScaledBitmap(src, sw, sh, true)
-    val px = IntArray(sw * sh)
-    scaled.getPixels(px, 0, sw, 0, 0, sw, sh)
-    val hw = sw * sh
-    val buf = FloatArray(3 * hw)
+    val px = IntArray(sw * sh); scaled.getPixels(px, 0, sw, 0, 0, sw, sh)
+    val hw = sw * sh; val buf = FloatArray(3 * hw)
     for (i in 0 until hw) {
       val p = px.get(i)
       val r = (((p ushr 16) and 255) / 127.5f) - 1f
@@ -35,9 +33,10 @@ object CreativeStudioAi {
     }
     val shape = if (nhwc) longArrayOf(1, sh.toLong(), sw.toLong(), 3) else longArrayOf(1, 3, sh.toLong(), sw.toLong())
     val inName = sess.inputNames.first()
-    val raw = Ort.withRun(modelFile, mapOf(inName to Ort.fTensor(shape, buf))) { res ->
-      Ort.readFloat(Ort.firstTensor(res))
-    }
+    val t = Ort.fTensor(shape, buf)
+    val res = sess.run(mapOf(inName to t))
+    val raw = Ort.readFloat(Ort.firstTensor(res))
+    res.close(); t.close()
     val outPx = IntArray(hw)
     for (i in 0 until hw) {
       val r = clampI(((if (nhwc) raw.get(i * 3) else raw.get(i)) + 1f) * 127.5f)
@@ -95,9 +94,10 @@ object CreativeStudioAi {
       buf.set(i, l); buf.set(hw + i, l); buf.set(2 * hw + i, l)
     }
     val inName = sess.inputNames.first()
-    val raw = Ort.withRun(modelFile, mapOf(inName to Ort.fTensor(longArrayOf(1, 3, sh.toLong(), sw.toLong()), buf))) { res ->
-      Ort.readFloat(Ort.firstTensor(res))
-    }
+    val t = Ort.fTensor(longArrayOf(1, 3, sh.toLong(), sw.toLong()), buf)
+    val res = sess.run(mapOf(inName to t))
+    val raw = Ort.readFloat(Ort.firstTensor(res))
+    res.close(); t.close()
     val mult = if ((raw.maxOrNull() ?: 1f) <= 2f) 255f else 1f
     val outPx = IntArray(hw)
     for (i in 0 until hw) outPx.set(i, (255 shl 24) or (clampI(raw.get(i) * mult) shl 16) or (clampI(raw.get(hw + i) * mult) shl 8) or clampI(raw.get(2 * hw + i) * mult))
@@ -143,20 +143,19 @@ object CreativeStudioAi {
     val eBmp = intsToBitmap(erasePx, w, h); val eMat = Mat(); Utils.bitmapToMat(eBmp, eMat)
     Imgproc.dilate(eMat, eMat, Imgproc.getStructuringElement(Imgproc.MORPH_ELLIPSE, Size(15.0, 15.0)))
     Utils.matToBitmap(eMat, eBmp)
-    return Lama.erase(src, eBmp, lamaFile)
+    return Lama.inpaint(src, eBmp, lamaFile)
   }
 
   fun applyPreset(src: Bitmap, preset: String): Bitmap {
     if (preset == "Original") return src
     val rgba = Mat(); Utils.bitmapToMat(src, rgba); val bgr = Mat(); Imgproc.cvtColor(rgba, bgr, Imgproc.COLOR_RGBA2BGR)
-    val f = Mat(); bgr.convertTo(f, CvType.CV_32FC3, 1.0 / 255.0); val ch = mutableListOf<Mat>(); Core.split(f, ch)
+
     when (preset) {
       "Teal & Orange" -> { Core.multiply(ch.get(2), Scalar(1.12), ch.get(2)); Core.multiply(ch.get(0), Scalar(1.08), ch.get(0)); Core.subtract(ch.get(1), Scalar(0.03), ch.get(1)) }
       "Kodak Gold 200" -> { Core.multiply(ch.get(2), Scalar(1.15), ch.get(2)); Core.multiply(ch.get(1), Scalar(1.06), ch.get(1)); Core.multiply(ch.get(0), Scalar(0.88), ch.get(0)) }
       "Moody Dark" -> { Core.multiply(ch.get(0), Scalar(0.84), ch.get(0)); Core.multiply(ch.get(1), Scalar(0.84), ch.get(1)); Core.multiply(ch.get(2), Scalar(0.88), ch.get(2)) }
       "Cyberpunk Neon" -> { Core.multiply(ch.get(0), Scalar(1.22), ch.get(0)); Core.multiply(ch.get(2), Scalar(1.18), ch.get(2)); Core.multiply(ch.get(1), Scalar(0.92), ch.get(1)) }
       "Golden Hour" -> { Core.add(ch.get(2), Scalar(0.08), ch.get(2)); Core.add(ch.get(1), Scalar(0.04), ch.get(1)); Core.multiply(ch.get(0), Scalar(0.85), ch.get(0)) }
-
       "Vintage 90s" -> { Core.add(ch.get(0), Scalar(0.06), ch.get(0)); Core.add(ch.get(1), Scalar(0.05), ch.get(1)); Core.add(ch.get(2), Scalar(0.04), ch.get(2)); Core.multiply(ch.get(2), Scalar(0.94), ch.get(2)) }
       "HDR Vivid" -> {
         Core.merge(ch, f); val hsv = Mat(); Imgproc.cvtColor(f, hsv, Imgproc.COLOR_BGR2HSV)
