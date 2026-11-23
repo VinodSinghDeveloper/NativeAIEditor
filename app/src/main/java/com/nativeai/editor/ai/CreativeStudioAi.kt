@@ -1,21 +1,30 @@
 package com.nativeai.editor.ai
-import android.graphics.*
+
+import android.graphics.Bitmap
+import android.graphics.Color
 import com.nativeai.editor.core.*
 import org.opencv.android.Utils
 import org.opencv.core.*
 import org.opencv.imgproc.Imgproc
+import org.opencv.photo.Photo
 import java.io.File
 import kotlin.math.*
 
 object CreativeStudioAi {
+
   fun runStyleOnnx(src: Bitmap, modelFile: File): Bitmap {
     val sess = Ort.session(modelFile)
-    val fixed = Ort.fixedInputHW(sess); val nhwc = Ort.isNhwcInput(sess)
+    val fixed = Ort.fixedInputHW(sess)
+    val nhwc = Ort.isNhwcInput(sess)
     val w = src.width; val h = src.height
     val scale = if (max(w, h) > 768) 768f / max(w, h) else 1f
     val sw = fixed?.second ?: max(32, ((w * scale).roundToInt() / 32) * 32)
     val sh = fixed?.first ?: max(32, ((h * scale).roundToInt() / 32) * 32)
-    val px = src.resize(sw, sh).pixels(); val hw = sw * sh; val buf = FloatArray(3 * hw)
+    val scaled = Bitmap.createScaledBitmap(src, sw, sh, true)
+    val px = IntArray(sw * sh)
+    scaled.getPixels(px, 0, sw, 0, 0, sw, sh)
+    val hw = sw * sh
+    val buf = FloatArray(3 * hw)
     for (i in 0 until hw) {
       val p = px.get(i)
       val r = (((p ushr 16) and 255) / 127.5f) - 1f
@@ -25,9 +34,10 @@ object CreativeStudioAi {
       else { buf.set(i, r); buf.set(hw + i, g); buf.set(2 * hw + i, b) }
     }
     val shape = if (nhwc) longArrayOf(1, sh.toLong(), sw.toLong(), 3) else longArrayOf(1, 3, sh.toLong(), sw.toLong())
-    val t = Ort.tensor(buf, shape)
-    val out = sess.run(mapOf(Ort.inputNames(sess).first() to t))
-    val raw = flatten(out.value, 3 * hw); out.close(); t.close()
+    val inName = sess.inputNames.first()
+    val raw = Ort.withRun(modelFile, mapOf(inName to Ort.fTensor(shape, buf))) { res ->
+      Ort.readFloat(Ort.firstTensor(res))
+    }
     val outPx = IntArray(hw)
     for (i in 0 until hw) {
       val r = clampI(((if (nhwc) raw.get(i * 3) else raw.get(i)) + 1f) * 127.5f)
@@ -35,7 +45,7 @@ object CreativeStudioAi {
       val b = clampI(((if (nhwc) raw.get(i * 3 + 2) else raw.get(2 * hw + i)) + 1f) * 127.5f)
       outPx.set(i, (255 shl 24) or (r shl 16) or (g shl 8) or b)
     }
-    return intsToBitmap(outPx, sw, sh).resize(w, h)
+    return Bitmap.createScaledBitmap(intsToBitmap(outPx, sw, sh), w, h, true)
   }
 
   fun nativeCartoon(src: Bitmap, mode: Int): Bitmap {
@@ -73,31 +83,35 @@ object CreativeStudioAi {
       Core.merge(ch, lab); Imgproc.cvtColor(lab, rgba, Imgproc.COLOR_Lab2RGB); Imgproc.cvtColor(rgba, rgba, Imgproc.COLOR_RGB2RGBA)
       return Bitmap.createBitmap(src.width, src.height, Bitmap.Config.ARGB_8888).also { Utils.matToBitmap(rgba, it) }
     }
-    val sess = Ort.session(modelFile); val fixed = Ort.fixedInputHW(sess) ?: (256 to 256)
-    val sh = fixed.first; val sw = fixed.second; val px = src.resize(sw, sh).pixels(); val hw = sw * sh
-    val buf = FloatArray(3 * hw)
+    val sess = Ort.session(modelFile)
+    val fixed = Ort.fixedInputHW(sess) ?: (256 to 256)
+    val sh = fixed.first; val sw = fixed.second
+    val scaled = Bitmap.createScaledBitmap(src, sw, sh, true)
+    val px = IntArray(sw * sh); scaled.getPixels(px, 0, sw, 0, 0, sw, sh)
+    val hw = sw * sh; val buf = FloatArray(3 * hw)
     for (i in 0 until hw) {
       val p = px.get(i)
       val l = (0.299f * ((p ushr 16) and 255) + 0.587f * ((p ushr 8) and 255) + 0.114f * (p and 255)) / 255f
       buf.set(i, l); buf.set(hw + i, l); buf.set(2 * hw + i, l)
     }
-    val t = Ort.tensor(buf, longArrayOf(1, 3, sh.toLong(), sw.toLong()))
-    val out = sess.run(mapOf(Ort.inputNames(sess).first() to t))
-    val raw = flatten(out.value, 3 * hw); out.close(); t.close()
+    val inName = sess.inputNames.first()
+    val raw = Ort.withRun(modelFile, mapOf(inName to Ort.fTensor(longArrayOf(1, 3, sh.toLong(), sw.toLong()), buf))) { res ->
+      Ort.readFloat(Ort.firstTensor(res))
+    }
     val mult = if ((raw.maxOrNull() ?: 1f) <= 2f) 255f else 1f
     val outPx = IntArray(hw)
     for (i in 0 until hw) outPx.set(i, (255 shl 24) or (clampI(raw.get(i) * mult) shl 16) or (clampI(raw.get(hw + i) * mult) shl 8) or clampI(raw.get(2 * hw + i) * mult))
-    return intsToBitmap(outPx, sw, sh).resize(src.width, src.height)
+    return Bitmap.createScaledBitmap(intsToBitmap(outPx, sw, sh), src.width, src.height, true)
   }
 
   fun restoreOldPhoto(src: Bitmap, gfpganFile: File?, detFile: File?): Bitmap {
     val rgba = Mat(); Utils.bitmapToMat(src, rgba)
     val bgr = Mat(); Imgproc.cvtColor(rgba, bgr, Imgproc.COLOR_RGBA2BGR); val clean = Mat()
-    Imgproc.fastNlMeansDenoisingColored(bgr, clean, 6f, 6f, 7, 21)
+    Photo.fastNlMeansDenoisingColored(bgr, clean, 6f, 6f, 7, 21)
     val gray = Mat(); Imgproc.cvtColor(clean, gray, Imgproc.COLOR_BGR2GRAY); val topHat = Mat()
     Imgproc.morphologyEx(gray, topHat, Imgproc.MORPH_TOPHAT, Imgproc.getStructuringElement(Imgproc.MORPH_RECT, Size(9.0, 9.0)))
     val mask = Mat(); Imgproc.threshold(topHat, mask, 45.0, 255.0, Imgproc.THRESH_BINARY)
-    val healed = Mat(); Imgproc.inpaint(clean, mask, healed, 3.0, Imgproc.INPAINT_TELEA)
+    val healed = Mat(); Photo.inpaint(clean, mask, healed, 3.0, Photo.INPAINT_TELEA)
     val lab = Mat(); Imgproc.cvtColor(healed, lab, Imgproc.COLOR_BGR2Lab)
     val ch = mutableListOf<Mat>(); Core.split(lab, ch); Imgproc.createCLAHE(1.8, Size(8.0, 8.0)).apply(ch.get(0), ch.get(0))
     Core.merge(ch, lab); Imgproc.cvtColor(lab, healed, Imgproc.COLOR_Lab2BGR); Imgproc.cvtColor(healed, rgba, Imgproc.COLOR_BGR2RGBA)
@@ -107,14 +121,19 @@ object CreativeStudioAi {
   }
 
   fun autoRemoveCrowd(src: Bitmap, segFile: File, lamaFile: File, keepMainSubject: Boolean = true): Bitmap {
-    val fgMask = Segmenter.segment(src, segFile); val w = src.width; val h = src.height
-    val mMat = Mat(); Utils.bitmapToMat(fgMask, mMat); val gray = Mat(); Imgproc.cvtColor(mMat, gray, Imgproc.COLOR_RGBA2GRAY)
-    val bin = Mat(); Imgproc.threshold(gray, bin, 90.0, 255.0, Imgproc.THRESH_BINARY)
+    val modelId = if (segFile.name.contains("rmbg", true)) "rmbg" else "u2netp"
+    val alpha = Segmenter.foregroundAlpha(src, modelId, segFile)
+    val w = src.width; val h = src.height
+    val bin = Mat(h, w, CvType.CV_8UC1)
+    val binBytes = ByteArray(w * h) { i -> if ((alpha.get(i).toInt() and 255) > 90) 255.toByte() else 0 }
+    bin.put(0, 0, binBytes)
+
     val labels = Mat(); val stats = Mat(); val centroids = Mat()
     val n = Imgproc.connectedComponentsWithStats(bin, labels, stats, centroids)
     if (n <= 1) return src
     var mainLabel = 1; var maxArea = 0
     for (i in 1 until n) { val a = stats.get(i, Imgproc.CC_STAT_AREA).get(0).toInt(); if (a > maxArea) { maxArea = a; mainLabel = i } }
+
     val erasePx = IntArray(w * h); val lblArr = IntArray(w * h); labels.get(0, 0, lblArr); var found = false
     for (i in 0 until w * h) {
       val l = lblArr.get(i)
@@ -137,6 +156,7 @@ object CreativeStudioAi {
       "Moody Dark" -> { Core.multiply(ch.get(0), Scalar(0.84), ch.get(0)); Core.multiply(ch.get(1), Scalar(0.84), ch.get(1)); Core.multiply(ch.get(2), Scalar(0.88), ch.get(2)) }
       "Cyberpunk Neon" -> { Core.multiply(ch.get(0), Scalar(1.22), ch.get(0)); Core.multiply(ch.get(2), Scalar(1.18), ch.get(2)); Core.multiply(ch.get(1), Scalar(0.92), ch.get(1)) }
       "Golden Hour" -> { Core.add(ch.get(2), Scalar(0.08), ch.get(2)); Core.add(ch.get(1), Scalar(0.04), ch.get(1)); Core.multiply(ch.get(0), Scalar(0.85), ch.get(0)) }
+
       "Vintage 90s" -> { Core.add(ch.get(0), Scalar(0.06), ch.get(0)); Core.add(ch.get(1), Scalar(0.05), ch.get(1)); Core.add(ch.get(2), Scalar(0.04), ch.get(2)); Core.multiply(ch.get(2), Scalar(0.94), ch.get(2)) }
       "HDR Vivid" -> {
         Core.merge(ch, f); val hsv = Mat(); Imgproc.cvtColor(f, hsv, Imgproc.COLOR_BGR2HSV)
@@ -146,19 +166,5 @@ object CreativeStudioAi {
     }
     Core.merge(ch, f); val outBgr = Mat(); f.convertTo(outBgr, CvType.CV_8UC3, 255.0); Imgproc.cvtColor(outBgr, rgba, Imgproc.COLOR_BGR2RGBA)
     return Bitmap.createBitmap(src.width, src.height, Bitmap.Config.ARGB_8888).also { Utils.matToBitmap(rgba, it) }
-  }
-
-  private fun flatten(v: Any?, exp: Int): FloatArray {
-
-    if (v is java.nio.FloatBuffer) return FloatArray(v.remaining()).also { v.get(it) }
-    val out = FloatArray(exp); var idx = 0
-    fun walk(o: Any?) {
-      if (idx >= exp || o == null) return
-      when (o) {
-        is FloatArray -> { val n = min(o.size, exp - idx); System.arraycopy(o, 0, out, idx, n); idx += n }
-        is Array<*> -> for (el in o) walk(el)
-      }
-    }
-    walk(v); return out
   }
 }
