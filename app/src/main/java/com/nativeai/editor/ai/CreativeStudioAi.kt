@@ -129,8 +129,16 @@ object CreativeStudioAi {
     val labels = Mat(); val stats = Mat(); val centroids = Mat()
     val n = Imgproc.connectedComponentsWithStats(bin, labels, stats, centroids)
     if (n <= 1) return src
-    var mainLabel = 1; var maxArea = 0
-    for (i in 1 until n) { val a = stats.get(i, Imgproc.CC_STAT_AREA).get(0).toInt(); if (a > maxArea) { maxArea = a; mainLabel = i } }
+    var mainLabel = 1; var bestScore = -1.0
+    val cx0 = w * 0.5; val cy0 = h * 0.5
+    for (i in 1 until n) {
+      val a = stats.get(i, Imgproc.CC_STAT_AREA).get(0)
+      if (a < (w * h * 0.004)) continue
+      val cx = centroids.get(i, 0).get(0); val cy = centroids.get(i, 1).get(0)
+      val dist = kotlin.math.hypot(cx - cx0, cy - cy0) / kotlin.math.hypot(cx0, cy0)
+      val score = a * (1.6 - dist)
+      if (score > bestScore) { bestScore = score; mainLabel = i }
+    }
 
     val erasePx = IntArray(w * h); val lblArr = IntArray(w * h); labels.get(0, 0, lblArr); var found = false
     for (i in 0 until w * h) {
