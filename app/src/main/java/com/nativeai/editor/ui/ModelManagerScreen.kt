@@ -60,7 +60,7 @@ fun ModelManagerScreen(vm: AppViewModel) {
           Spacer(Modifier.height(4.dp))
         }
       }
-      items(ModelCatalog.all) { def ->
+      items(ModelCatalog.all.filter { !it.id.startsWith("sd_") }) { def ->
         val st = states[def.id]
         Card(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp)) {
           Column(Modifier.padding(12.dp)) {
