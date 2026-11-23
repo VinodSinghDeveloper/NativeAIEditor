@@ -1,297 +1,287 @@
 package com.nativeai.editor.ui
 
-import android.Manifest
-import android.content.pm.PackageManager
 import android.net.Uri
-import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.core.content.ContextCompat
-import com.nativeai.editor.*
-import com.nativeai.editor.ai.ModelCatalog
-import com.nativeai.editor.ai.ModelDownloader
-import kotlinx.coroutines.launch
+import com.nativeai.editor.AppViewModel
+import com.nativeai.editor.Panel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun EditorScreen(vm: AppViewModel) {
   val ui = vm.ui
-  val context = LocalContext.current
-  val snackbar = remember { SnackbarHostState() }
-  val scope = rememberCoroutineScope()
-  val states by vm.downloader.states.collectAsState()
+  var activeTab by remember { mutableIntStateOf(0) }
+  var showOriginalHold by remember { mutableStateOf(false) }
 
-  val openLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
-    if (uri != null) vm.loadPhoto(uri)
+  val pickMain = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
+    uri?.let { vm.openImage(it) }
   }
-  val faceLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
-    if (uri != null) vm.setSourceFace(uri)
-  }
-  val textureLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
-    if (uri != null) vm.setTexture(uri)
-  }
-  val permLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-    if (granted) vm.export()
-    else scope.launch { snackbar.showSnackbar("Storage permission required on Android 9 and below") }
+  val pickFace = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
+    uri?.let { vm.setSourceFace(it) }
   }
 
-  LaunchedEffect(ui.message) {
-    ui.message?.let { snackbar.showSnackbar(it); vm.clearMessage() }
-  }
-
-  if (ui.showModels) { ModelManagerScreen(vm); return }
-
-  if (ui.showFirstRun) {
-    val coreMB = ModelCatalog.core.sumOf { it.approxMB }
-    AlertDialog(
-      onDismissRequest = { vm.skipFirstRun() },
-      title = { Text("Download AI models?") },
-      text = {
-        Text(
-          "First launch downloads the core on-device models (~$coreMB MB: LaMa eraser, MobileSAM tap-select, " +
-            "U2NetP cutout, MiDaS depth). After that everything runs 100% offline. Use Wi-Fi if possible."
-        )
-      },
-      confirmButton = { TextButton(onClick = { vm.downloadCore() }) { Text("Download now") } },
-      dismissButton = { TextButton(onClick = { vm.skipFirstRun() }) { Text("Later") } }
-    )
-  }
-
-  val coreDownloading = ModelCatalog.core.any { states[it.id]?.status == ModelDownloader.Status.Downloading }
-  val coreProgress = ModelCatalog.core.map { states[it.id]?.progress ?: 0f }.average().toFloat()
+  val studioBg = Color(0xFF0A0C10)
+  val cardBg = Color(0xFF141821)
+  val accentGrad = Brush.horizontalGradient(listOf(Color(0xFF6366F1), Color(0xFFA855F7), Color(0xFFEC4899)))
 
   Scaffold(
-    snackbarHost = { SnackbarHost(snackbar) },
+    containerColor = studioBg,
     topBar = {
-      TopAppBar(
-        title = { Text("Native AI Editor", fontSize = 17.sp) },
-        actions = {
-          TextButton(onClick = { vm.undo() }, enabled = ui.canUndo) { Text("Undo") }
-          TextButton(onClick = { vm.redo() }, enabled = ui.canRedo) { Text("Redo") }
-          TextButton(onClick = { vm.showModels(true) }) { Text("Models") }
-          TextButton(onClick = { openLauncher.launch("image/*") }) { Text("Open") }
+      Row(
+        modifier = Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 12.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+      ) {
+        Column(modifier = Modifier.weight(1f)) {
+          Text("RealMind ChalChitra AI", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+          Text("Offline AI Photo Studio", color = Color(0xFF94A3B8), fontSize = 11.sp)
         }
-      )
-    }
-  ) { pad ->
-    Column(Modifier.padding(pad).fillMaxSize()) {
-      if (coreDownloading) {
-        Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp)) {
-          Text("Downloading core models… ${(coreProgress * 100).toInt()}%", fontSize = 12.sp)
-          LinearProgressIndicator(progress = { coreProgress }, modifier = Modifier.fillMaxWidth())
+        IconButton(onClick = { vm.undo() }, enabled = ui.canUndo) {
+          Icon(Icons.Rounded.Undo, "Undo", tint = if (ui.canUndo) Color.White else Color(0xFF475569))
+        }
+        IconButton(onClick = { vm.redo() }, enabled = ui.canRedo) {
+          Icon(Icons.Rounded.Redo, "Redo", tint = if (ui.canRedo) Color.White else Color(0xFF475569))
+        }
+        FilledTonalButton(
+          onClick = { vm.showModels(true) },
+          contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+          colors = ButtonDefaults.filledTonalButtonColors(containerColor = Color(0xFF1E293B), contentColor = Color(0xFF38BDF8))
+        ) {
+          Icon(Icons.Rounded.Memory, null, modifier = Modifier.size(16.dp))
+          Spacer(Modifier.width(4.dp))
+          Text("AI Models", fontSize = 12.sp)
+        }
+        Spacer(Modifier.width(6.dp))
+        Button(
+          onClick = { vm.export() },
+          enabled = ui.bitmap != null && !ui.busy,
+          contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+          colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6366F1))
+        ) {
+          Icon(Icons.Rounded.Download, null, modifier = Modifier.size(16.dp))
+          Spacer(Modifier.width(4.dp))
+          Text("Save", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
         }
       }
-      Box(Modifier.weight(1f).fillMaxWidth()) {
-        val bmp = ui.bitmap
-        if (bmp == null) {
-          Column(Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally) {
-            Text("Open a photo to start", fontSize = 16.sp)
-            Spacer(Modifier.height(12.dp))
-            Button(onClick = { openLauncher.launch("image/*") }) { Text("Open Photo") }
+    }
+  ) { pad ->
+    Column(modifier = Modifier.fillMaxSize().padding(pad)) {
+      Box(modifier = Modifier.weight(1f).fillMaxWidth().padding(horizontal = 10.dp, vertical = 4.dp).clip(RoundedCornerShape(18.dp)).background(Color(0xFF0F131A))) {
+        val displayBmp = if (showOriginalHold && ui.original != null) ui.original else ui.bitmap
+        if (displayBmp == null) {
+          Column(
+            modifier = Modifier.fillMaxSize().clickable { pickMain.launch("image/*") },
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+          ) {
+            Box(modifier = Modifier.size(72.dp).clip(CircleShape).background(accentGrad), contentAlignment = Alignment.Center) {
+              Icon(Icons.Rounded.AddPhotoAlternate, null, tint = Color.White, modifier = Modifier.size(36.dp))
+            }
+            Spacer(Modifier.height(14.dp))
+            Text("Tap to Open Photo in AI Studio", color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
+            Text("100% Offline • 4K Export • Zero Watermark", color = Color(0xFF94A3B8), fontSize = 12.sp)
           }
         } else {
           EditorCanvas(
-            bitmap = bmp, original = ui.original, mask = vm.mask, maskVersion = ui.maskVersion,
-            maskOpacity = ui.maskOpacity, maskInverted = ui.maskInverted, tool = ui.tool,
-            compare = ui.compare, split = ui.split, onSplit = vm::setSplit,
-            cropMode = ui.cropMode, cropRect = ui.cropRect, onCrop = vm::setCropRect,
-            onStrokeStart = vm::strokeStart, onStrokeMove = vm::strokeMove, onStrokeEnd = vm::strokeEnd,
-            onTap = { p -> vm.samTap(p.x, p.y) }
+            bitmap = displayBmp,
+            mask = if (showOriginalHold) null else vm.mask,
+            maskVersion = ui.maskVersion,
+            showMask = !showOriginalHold && (activeTab == 2 || activeTab == 4),
+            cropMode = ui.cropMode,
+            cropRect = ui.cropRect,
+            onCropChange = { vm.setCropRect(it) },
+            onTapImage = { x, y -> if (activeTab == 2) vm.tapSelect(x, y) },
+            onStroke = { pts, erase -> vm.drawStroke(pts, erase) }
           )
-          val busyText = ui.busy
-          if (busyText != null) {
-            Surface(color = Color(0xCC101014), modifier = Modifier.fillMaxSize()) {}
-            Column(
-              Modifier.align(Alignment.Center),
-              horizontalAlignment = Alignment.CenterHorizontally
+
+          Row(modifier = Modifier.align(Alignment.TopStart).padding(10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Surface(
+              shape = RoundedCornerShape(20.dp),
+              color = Color(0xCC0F172A),
+              modifier = Modifier.clickable { pickMain.launch("image/*") }
             ) {
-              CircularProgressIndicator()
-              Spacer(Modifier.height(10.dp))
-              Text(busyText, fontSize = 14.sp)
-              ui.progress?.let {
-                Spacer(Modifier.height(8.dp))
-                LinearProgressIndicator(progress = { it }, modifier = Modifier.width(220.dp))
+              Row(modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Rounded.PhotoLibrary, null, tint = Color(0xFF38BDF8), modifier = Modifier.size(15.dp))
+                Spacer(Modifier.width(4.dp))
+                Text("Change Photo", color = Color.White, fontSize = 11.sp)
               }
+            }
+          }
+
+          if (ui.original != null) {
+            Surface(
+              shape = RoundedCornerShape(20.dp),
+              color = if (showOriginalHold) Color(0xFF6366F1) else Color(0xCC0F172A),
+              modifier = Modifier.align(Alignment.TopEnd).padding(10.dp).pointerInput(Unit) {
+                detectTapGestures(onPress = {
+                  showOriginalHold = true
+                  tryAwaitRelease()
+                  showOriginalHold = false
+                })
+              }
+            ) {
+              Row(modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Rounded.Compare, null, tint = Color.White, modifier = Modifier.size(15.dp))
+                Spacer(Modifier.width(4.dp))
+                Text(if (showOriginalHold) "Original" else "Hold: Before", color = Color.White, fontSize = 11.sp)
+              }
+            }
+          }
+        }
+
+        if (ui.busy) {
+          Box(modifier = Modifier.fillMaxSize().background(Color(0xBB05070A)), contentAlignment = Alignment.Center) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(24.dp)) {
+              CircularProgressIndicator(color = Color(0xFFA855F7))
+              Spacer(Modifier.height(12.dp))
+              Text(ui.busyLabel, color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+              Spacer(Modifier.height(6.dp))
+              LinearProgressIndicator(progress = { ui.progress }, color = Color(0xFF38BDF8), modifier = Modifier.width(180.dp))
             }
           }
         }
       }
 
-      if (ui.bitmap != null) {
-        Row(
-          Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 8.dp),
-          verticalAlignment = Alignment.CenterVertically
-        ) {
-          Chip(ui.tool == Tool.Brush, "Brush") { vm.setTool(Tool.Brush) }
-          Chip(ui.tool == Tool.Erase, "Eraser") { vm.setTool(Tool.Erase) }
-          Chip(ui.tool == Tool.Pan, "Pan") { vm.setTool(Tool.Pan) }
-          Chip(ui.tool == Tool.Tap, "Tap-Select") { vm.setTool(Tool.Tap) }
-          Chip(ui.compare, "Before/After") { vm.toggleCompare() }
-          Chip(ui.maskInverted, if (ui.maskInverted) "Mask: BG" else "Mask: FG") { vm.toggleInvert() }
-          Chip(false, "Clear Mask") { vm.clearMask() }
-        }
-        if (ui.tool == Tool.Brush || ui.tool == Tool.Erase) {
-          SliderRow("Brush size", ui.brushSize, 4f..300f, { vm.setBrush(it, ui.feather, ui.maskOpacity) }, { "%.0f".format(it) })
-          SliderRow("Feather", ui.feather, 0f..1f, { vm.setBrush(ui.brushSize, it, ui.maskOpacity) })
-          SliderRow("Mask alpha", ui.maskOpacity, 0f..1f, { vm.setBrush(ui.brushSize, ui.feather, it) })
-        }
-        Row(Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 8.dp)) {
-          Panel.entries.filter { it != Panel.None }.forEach { p ->
-            Chip(ui.panel == p, p.name) { vm.set(p) }
-          }
-        }
-        if (ui.panel != Panel.None) {
-          Column(Modifier.heightIn(max = 280.dp).verticalScroll(rememberScrollState()).fillMaxWidth()) {
-            when (ui.panel) {
-              Panel.Erase -> {
-                PanelTitle("Magic Object Eraser — paint over the object, then run LaMa")
-                Row(Modifier.padding(horizontal = 12.dp)) {
-                  Button(onClick = { vm.runLama() }) { Text("Erase & Inpaint (LaMa)") }
-                }
+      Surface(color = cardBg, shape = RoundedCornerShape(topStart = 22.dp, topEnd = 22.dp), modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.navigationBarsPadding().padding(top = 10.dp, bottom = 8.dp)) {
+          val hasImg = ui.bitmap != null && !ui.busy
+          when (activeTab) {
+            0 -> { // 1-Tap AI Magic
+              Row(modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                StudioActionCard("Remove Crowd", Icons.Rounded.Groups, Color(0xFFEC4899), hasImg) { vm.autoRemoveCrowd(true) }
+                StudioActionCard("Old Restore", Icons.Rounded.AutoFixHigh, Color(0xFFF59E0B), hasImg) { vm.restoreOldPhoto() }
+                StudioActionCard("B&W Colorize", Icons.Rounded.Palette, Color(0xFF10B981), hasImg) { vm.colorizeBwPhoto() }
+                StudioActionCard("4K Enhance", Icons.Rounded.Hd, Color(0xFF6366F1), hasImg) { vm.enhanceFaces(); vm.upscale() }
+                StudioActionCard("Auto Enhance", Icons.Rounded.AutoAwesome, Color(0xFF38BDF8), hasImg) { vm.autoEnhance() }
               }
-              Panel.Select -> {
-                PanelTitle("Smart Tap Auto-Select — tap any object with the Tap-Select tool")
-                Row(Modifier.padding(horizontal = 12.dp)) {
-                  Chip(false, "Enable Tap tool") { vm.setTool(Tool.Tap) }
-                  Chip(false, "Clear selection") { vm.clearMask() }
-                }
-              }
-              Panel.Cutout -> {
-                PanelTitle("Background / Foreground Eraser")
-                Row(Modifier.padding(horizontal = 12.dp)) {
-                  Chip(ui.cutoutModel == "u2netp", "U2NetP (fast)") { vm.setCutoutModel("u2netp") }
-                  Chip(ui.cutoutModel == "rmbg", "RMBG-1.4 (quality)") { vm.setCutoutModel("rmbg") }
-                }
-                Row(Modifier.padding(horizontal = 12.dp).horizontalScroll(rememberScrollState())) {
-                  Chip(false, "Keep subject (cutout)") { vm.runCutout(0) }
-                  Chip(false, "Erase background + fill") { vm.runCutout(1) }
-                  Chip(false, "Erase subject + fill") { vm.runCutout(2) }
-                }
-              }
-              Panel.Face -> {
-                PanelTitle("AI Face Swap — source face + current photo as target")
-                Row(
-                  Modifier.padding(horizontal = 12.dp).horizontalScroll(rememberScrollState()),
-                  verticalAlignment = Alignment.CenterVertically
-                ) {
-                  Chip(false, if (ui.hasSourceFace) "Source loaded (change)" else "Pick Source Face") { faceLauncher.launch("image/*") }
-                  Chip(false, "Pick Target Photo") { openLauncher.launch("image/*") }
-                }
-                Row(Modifier.padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                  Text("GFPGAN enhance", fontSize = 12.sp)
-                  Switch(
-                    checked = ui.faceEnhance,
-                    onCheckedChange = { vm.setFaceEnhance(it) },
-                    modifier = Modifier.padding(horizontal = 8.dp)
-                  )
-                  Button(onClick = { vm.runFaceSwap() }, enabled = ui.hasSourceFace) { Text("Swap Faces") }
-                }
-              }
-              Panel.Upscale -> {
-                PanelTitle("4K Ultra HD Upscaler — memory-safe tiled Real-ESRGAN x4")
-                Row(Modifier.padding(horizontal = 12.dp)) {
-                  Button(onClick = { vm.runUpscale() }) { Text("Upscale x4 (max 4096px)") }
-                }
-              }
-              Panel.Portrait -> {
-                PanelTitle("AI DSLR Portrait Blur — MiDaS depth + adjustable bokeh")
-                Row(Modifier.padding(horizontal = 12.dp)) {
-                  Button(onClick = { vm.computeDepth() }) { Text(if (ui.depthReady) "Re-analyze Depth" else "Analyze Depth") }
-                }
-                if (ui.depthReady) {
-                  SliderRow("Bokeh", ui.bokehAmount, 0f..1f, { vm.setBokeh(it, ui.bokehFocus, ui.bokehRange) })
-                  SliderRow("Focus depth", ui.bokehFocus, 0f..1f, { vm.setBokeh(ui.bokehAmount, it, ui.bokehRange) })
-                  SliderRow("Depth range", ui.bokehRange, 0.05f..0.5f, { vm.setBokeh(ui.bokehAmount, ui.bokehFocus, it) })
-                }
-              }
-              Panel.Style -> {
-                PanelTitle("Outfit & Style — select region, then native LAB/HSV transfer")
-                Row(Modifier.padding(horizontal = 12.dp)) {
-                  Chip(ui.styleLab, "LAB") { vm.setStyle(true, ui.styleHue, ui.styleSat, ui.styleLight, ui.textureStrength) }
-                  Chip(!ui.styleLab, "HSV") { vm.setStyle(false, ui.styleHue, ui.styleSat, ui.styleLight, ui.textureStrength) }
-                  Chip(false, if (ui.hasTexture) "Texture loaded" else "Pick texture") { textureLauncher.launch("image/*") }
-                }
-                SliderRow("Hue shift", ui.styleHue, -180f..180f, { vm.setStyle(ui.styleLab, it, ui.styleSat, ui.styleLight, ui.textureStrength) }, { "%.0f".format(it) })
-                SliderRow("Saturation", ui.styleSat, 0f..2f, { vm.setStyle(ui.styleLab, ui.styleHue, it, ui.styleLight, ui.textureStrength) })
-                SliderRow("Lightness", ui.styleLight, -60f..60f, { vm.setStyle(ui.styleLab, ui.styleHue, ui.styleSat, it, ui.textureStrength) }, { "%.0f".format(it) })
-                SliderRow("Texture mix", ui.textureStrength, 0f..1f, { vm.setStyle(ui.styleLab, ui.styleHue, ui.styleSat, ui.styleLight, it) })
-                Row(Modifier.padding(horizontal = 12.dp)) {
-                  Button(onClick = { vm.applyStyle() }) { Text("Apply Restyle") }
-                }
-                PanelTitle("SD-Turbo ONNX (import models first) — local generative restyle")
-                OutlinedTextField(
-                  value = ui.sdPrompt,
-                  onValueChange = { vm.setSd(it, ui.sdStrength) },
-                  label = { Text("Prompt") },
-                  singleLine = true,
-                  modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp)
-                )
-                SliderRow("Strength", ui.sdStrength, 0.1f..1f, { vm.setSd(ui.sdPrompt, it) })
-                Row(Modifier.padding(horizontal = 12.dp)) {
-                  Button(onClick = { vm.runSdTurbo() }) { Text("Run SD-Turbo (1 step)") }
-                }
-              }
-              Panel.Adjust -> {
-                PanelTitle("Pro Manual Adjustments")
-                val a = ui.adjust
-                SliderRow("Exposure", a.exposure, -2f..2f, { vm.setAdjust(a.copy(exposure = it)) })
-                SliderRow("Contrast", a.contrast, -1f..1f, { vm.setAdjust(a.copy(contrast = it)) })
-                SliderRow("Highlights", a.highlights, -1f..1f, { vm.setAdjust(a.copy(highlights = it)) })
-                SliderRow("Shadows", a.shadows, -1f..1f, { vm.setAdjust(a.copy(shadows = it)) })
-                SliderRow("Saturation", a.saturation, -1f..1f, { vm.setAdjust(a.copy(saturation = it)) })
-                SliderRow("Vibrance", a.vibrance, -1f..1f, { vm.setAdjust(a.copy(vibrance = it)) })
-                SliderRow("Temperature", a.temperature, -1f..1f, { vm.setAdjust(a.copy(temperature = it)) })
-                SliderRow("Sharpness", a.sharpness, 0f..1f, { vm.setAdjust(a.copy(sharpness = it)) })
-                SliderRow("Vignette", a.vignette, 0f..1f, { vm.setAdjust(a.copy(vignette = it)) })
-                Row(Modifier.padding(horizontal = 12.dp).horizontalScroll(rememberScrollState())) {
-                  Chip(ui.cropMode, if (ui.cropMode) "Apply Crop" else "Crop") {
-                    if (ui.cropMode) vm.applyCrop() else vm.setCropMode(true)
-                  }
-                  Chip(false, "Rotate 90") { vm.rotate() }
-                  Chip(false, "Flip H") { vm.flip(true) }
-                  Chip(false, "Flip V") { vm.flip(false) }
-                  Chip(false, "Done") { vm.commitAdjust() }
-                }
-              }
-              Panel.Export -> {
-                PanelTitle("4K Export to Gallery")
-                Row(Modifier.padding(horizontal = 12.dp)) {
-                  Chip(ui.exportFormat == 0, "PNG") { vm.setExport(0, ui.exportQuality) }
-                  Chip(ui.exportFormat == 1, "JPG") { vm.setExport(1, ui.exportQuality) }
-                  Chip(ui.exportFormat == 2, "WEBP") { vm.setExport(2, ui.exportQuality) }
-                }
-                if (ui.exportFormat != 0) {
-                  SliderRow("Quality", ui.exportQuality.toFloat(), 50f..100f, { vm.setExport(ui.exportFormat, it.toInt()) }, { "%.0f".format(it) })
-                }
-                Row(Modifier.padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                  Button(onClick = {
-                    if (Build.VERSION.SDK_INT < 29 &&
-                      ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED
-                    ) permLauncher.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
-                    else vm.export()
-                  }) { Text("Save to Gallery") }
-                  Spacer(Modifier.width(12.dp))
-                  Text("${ui.bitmap!!.width}x${ui.bitmap!!.height}px", fontSize = 12.sp)
-                }
-              }
-              Panel.None -> {}
             }
-            Spacer(Modifier.height(8.dp))
+            1 -> { // Anime & Art
+              Row(modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                StudioActionCard("Anime Hayao", Icons.Rounded.Animation, Color(0xFFEC4899), hasImg) { vm.applyAnime(false) }
+                StudioActionCard("3D Shinkai", Icons.Rounded.MovieFilter, Color(0xFF8B5CF6), hasImg) { vm.applyAnime(true) }
+                StudioActionCard("Comic Cartoon", Icons.Rounded.Brush, Color(0xFFF59E0B), hasImg) { vm.applyCartoonMode(0) }
+                StudioActionCard("Pencil Sketch", Icons.Rounded.Draw, Color(0xFF94A3B8), hasImg) { vm.applyCartoonMode(1) }
+                StudioActionCard("Leica B&W", Icons.Rounded.FilterBAndW, Color(0xFFE2E8F0), hasImg) { vm.applyCartoonMode(2) }
+              }
+            }
+            2 -> { // Magic Erase
+              Column(modifier = Modifier.padding(horizontal = 12.dp)) {
+                Row(modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                  StudioActionCard("Erase Marked", Icons.Rounded.AutoFixNormal, Color(0xFFEF4444), hasImg) { vm.eraseSelected() }
+                  StudioActionCard("Clear Mask", Icons.Rounded.LayersClear, Color(0xFF64748B), hasImg) { vm.clearMask() }
+                  StudioActionCard("Invert Mask", Icons.Rounded.Flip, Color(0xFF38BDF8), hasImg) { vm.invertMask() }
+                }
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 4.dp)) {
+                  Text("Brush", color = Color(0xFF94A3B8), fontSize = 11.sp)
+                  Slider(value = ui.brushRadius, onValueChange = { vm.setBrushRadius(it) }, valueRange = 8f..90f, modifier = Modifier.weight(1f).height(28.dp))
+                  Text("${ui.brushRadius.toInt()}", color = Color.White, fontSize = 11.sp)
+                }
+              }
+            }
+            3 -> { // Face Studio
+              Row(modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                StudioActionCard("Pick New Face", Icons.Rounded.FaceRetouchingNatural, Color(0xFF38BDF8), hasImg) { pickFace.launch("image/*") }
+                StudioActionCard("Swap Face", Icons.Rounded.SwapHoriz, Color(0xFFA855F7), hasImg && ui.sourceFace != null) { vm.swapFace() }
+                StudioActionCard("HD Face Fix", Icons.Rounded.HighQuality, Color(0xFF10B981), hasImg) { vm.enhanceFaces() }
+                StudioActionCard("4x Upscale", Icons.Rounded.ZoomOutMap, Color(0xFFF59E0B), hasImg) { vm.upscale() }
+              }
+            }
+            4 -> { // Cutout & Bokeh
+              Column(modifier = Modifier.padding(horizontal = 12.dp)) {
+                Row(modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                  StudioActionCard("Remove BG", Icons.Rounded.ContentCut, Color(0xFFEC4899), hasImg) { vm.removeBackground() }
+                  StudioActionCard("DSLR Bokeh", Icons.Rounded.BlurOn, Color(0xFF6366F1), hasImg) { vm.applyBokeh() }
+                  StudioActionCard("Auto Subject", Icons.Rounded.PersonSearch, Color(0xFF10B981), hasImg) { vm.autoSegment() }
+                  StudioActionCard("Rotate 90°", Icons.Rounded.RotateRight, Color(0xFF38BDF8), hasImg) { vm.rotate() }
+                }
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 4.dp)) {
+                  Text("DSLR Blur", color = Color(0xFF94A3B8), fontSize = 11.sp)
+                  Slider(value = ui.bokehStrength, onValueChange = { vm.setBokehStrength(it) }, valueRange = 2f..30f, modifier = Modifier.weight(1f).height(28.dp))
+                  Text("f/${(32f / ui.bokehStrength).toString().take(3)}", color = Color.White, fontSize = 11.sp)
+                }
+              }
+            }
+            5 -> { // Cinema Presets & Pro Adjust
+              Row(modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf("Teal & Orange", "Kodak Gold 200", "Moody Dark", "Cyberpunk Neon", "Golden Hour", "Vintage 90s", "HDR Vivid").forEach { preset ->
+                  StudioActionCard(preset, Icons.Rounded.CameraEnhance, Color(0xFF8B5CF6), hasImg) { vm.applyCinemaPreset(preset) }
+                }
+              }
+            }
+          }
+
+          Spacer(Modifier.height(8.dp))
+          Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 6.dp), horizontalArrangement = Arrangement.SpaceAround) {
+            val tabs = listOf(
+              "AI Magic" to Icons.Rounded.AutoAwesome,
+              "Anime/Art" to Icons.Rounded.Animation,
+              "Erase" to Icons.Rounded.AutoFixNormal,
+              "Face" to Icons.Rounded.Face,
+              "Cutout" to Icons.Rounded.BlurOn,
+              "Presets" to Icons.Rounded.Tune
+            )
+            tabs.forEachIndexed { index, pair ->
+              val selected = activeTab == index
+              Column(
+                modifier = Modifier.clip(RoundedCornerShape(12.dp)).clickable { activeTab = index }.padding(horizontal = 8.dp, vertical = 4.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+              ) {
+                Icon(pair.second, pair.first, tint = if (selected) Color(0xFFA855F7) else Color(0xFF64748B), modifier = Modifier.size(21.dp))
+                Text(pair.first, color = if (selected) Color.White else Color(0xFF64748B), fontSize = 10.sp, fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal)
+              }
+            }
           }
         }
       }
     }
+  }
+
+  ui.snackbar?.let { m ->
+    LaunchedEffect(m) {
+      kotlinx.coroutines.delay(2600)
+      vm.clearSnackbar()
+    }
+  }
+}
+
+@Composable
+private fun StudioActionCard(title: String, icon: ImageVector, accent: Color, enabled: Boolean, onClick: () -> Unit) {
+  Column(
+    modifier = Modifier
+      .width(84.dp)
+      .clip(RoundedCornerShape(14.dp))
+      .background(if (enabled) Color(0xFF1E2433) else Color(0xFF11151E))
+      .border(1.dp, if (enabled) accent.copy(alpha = 0.45f) else Color(0xFF1E293B), RoundedCornerShape(14.dp))
+      .clickable(enabled = enabled) { onClick() }
+      .padding(vertical = 10.dp, horizontal = 6.dp),
+    horizontalAlignment = Alignment.CenterHorizontally
+  ) {
+    Box(modifier = Modifier.size(34.dp).clip(CircleShape).background(accent.copy(alpha = if (enabled) 0.2f else 0.08f)), contentAlignment = Alignment.Center) {
+      Icon(icon, title, tint = if (enabled) accent else Color(0xFF475569), modifier = Modifier.size(19.dp))
+    }
+    Spacer(Modifier.height(6.dp))
+    Text(title, color = if (enabled) Color.White else Color(0xFF475569), fontSize = 10.sp, maxLines = 1, fontWeight = FontWeight.Medium)
   }
 }

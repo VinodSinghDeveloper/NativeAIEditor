@@ -516,6 +516,74 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     ui = ui.copy(showFirstRun = false)
   }
 
+
+  fun autoRemoveCrowd(keepMain: Boolean = true) {
+    val bmp = ui.bitmap ?: return
+    val lamaF = downloader.file("lama").takeIf { it.exists() } ?: run { msg("Download LaMa Magic Eraser first"); return }
+    val segF = downloader.file("rmbg").takeIf { it.exists() } ?: downloader.file("u2netp").takeIf { it.exists() } ?: run { msg("Download U2NetP or RMBG first"); return }
+    runOp("AI Removing Crowd...") { p ->
+      p(0.3f)
+      val out = CreativeStudioAi.autoRemoveCrowd(bmp, segF, lamaF, keepMain)
+      p(1f)
+      withContext(Dispatchers.Main) { pushUndo(); ui = ui.copy(bitmap = out); invalidateCaches(); msg("Crowd removed!") }
+    }
+  }
+
+  fun applyAnime(shinkai: Boolean = false) {
+    val bmp = ui.bitmap ?: return
+    val id = if (shinkai) "anime_shinkai" else "anime_hayao"
+    val f = downloader.file(id).takeIf { it.exists() }
+    runOp(if (shinkai) "Rendering 3D Shinkai Anime..." else "Rendering Hayao Anime...") { p ->
+      p(0.35f)
+      val out = if (f != null) CreativeStudioAi.runStyleOnnx(bmp, f) else CreativeStudioAi.nativeCartoon(bmp, 0)
+      p(1f)
+      withContext(Dispatchers.Main) { pushUndo(); ui = ui.copy(bitmap = out); invalidateCaches() }
+    }
+  }
+
+  fun applyCartoonMode(mode: Int) {
+    val bmp = ui.bitmap ?: return
+    runOp("Applying Art Style...") { p ->
+      p(0.4f)
+      val out = CreativeStudioAi.nativeCartoon(bmp, mode)
+      p(1f)
+      withContext(Dispatchers.Main) { pushUndo(); ui = ui.copy(bitmap = out); invalidateCaches() }
+    }
+  }
+
+  fun colorizeBwPhoto() {
+    val bmp = ui.bitmap ?: return
+    val f = downloader.file("colorizer").takeIf { it.exists() }
+    runOp("Colorizing B&W Photo...") { p ->
+      p(0.35f)
+      val out = CreativeStudioAi.colorizeBw(bmp, f)
+      p(1f)
+      withContext(Dispatchers.Main) { pushUndo(); ui = ui.copy(bitmap = out); invalidateCaches() }
+    }
+  }
+
+  fun restoreOldPhoto() {
+    val bmp = ui.bitmap ?: return
+    val gfp = downloader.file("gfpgan").takeIf { it.exists() }
+    val det = downloader.file("face_det").takeIf { it.exists() }
+    runOp("Restoring Old Photo & Face...") { p ->
+      p(0.3f)
+      val out = CreativeStudioAi.restoreOldPhoto(bmp, gfp, det)
+      p(1f)
+      withContext(Dispatchers.Main) { pushUndo(); ui = ui.copy(bitmap = out); invalidateCaches(); msg("Old photo restored!") }
+    }
+  }
+
+  fun applyCinemaPreset(preset: String) {
+    val bmp = ui.bitmap ?: return
+    runOp("Applying $preset...") { p ->
+      p(0.5f)
+      val out = CreativeStudioAi.applyPreset(bmp, preset)
+      p(1f)
+      withContext(Dispatchers.Main) { pushUndo(); ui = ui.copy(bitmap = out); invalidateCaches() }
+    }
+  }
+
   override fun onCleared() {
     sam?.close()
     super.onCleared()
