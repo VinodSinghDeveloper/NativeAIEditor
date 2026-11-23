@@ -121,8 +121,8 @@ fun EditorScreen(vm: AppViewModel) {
               StudioActionCard("Remove Crowd", Icons.Rounded.Person, Color(0xFFEC4899), hasImg) { vm.autoRemoveCrowd(true) }
               StudioActionCard("Old Restore", Icons.Rounded.Star, Color(0xFFF59E0B), hasImg) { vm.restoreOldPhoto() }
               StudioActionCard("B&W Colorize", Icons.Rounded.Create, Color(0xFF10B981), hasImg) { vm.colorizeBwPhoto() }
-              StudioActionCard("4K Enhance", Icons.Rounded.ThumbUp, Color(0xFF6366F1), hasImg) { vm.enhanceFaces(); vm.upscale() }
-              StudioActionCard("Auto Enhance", Icons.Rounded.CheckCircle, Color(0xFF38BDF8), hasImg) { vm.autoEnhance() }
+              StudioActionCard("4K Enhance", Icons.Rounded.ThumbUp, Color(0xFF6366F1), hasImg) { vm.setFaceEnhance(true); vm.runUpscale() }
+              StudioActionCard("Auto Enhance", Icons.Rounded.CheckCircle, Color(0xFF38BDF8), hasImg) { vm.setAdjust(ui.adjust.copy(contrast = 0.18f, vibrance = 0.25f)); vm.commitAdjust() }
             }
             1 -> Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
               StudioActionCard("Anime Hayao", Icons.Rounded.PlayArrow, Color(0xFFEC4899), hasImg) { vm.applyAnime(false) }
@@ -133,33 +133,33 @@ fun EditorScreen(vm: AppViewModel) {
             }
             2 -> Column(Modifier.padding(horizontal = 12.dp)) {
               Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                StudioActionCard("Erase Marked", Icons.Rounded.Delete, Color(0xFFEF4444), hasImg) { vm.eraseSelected() }
+                StudioActionCard("Erase Marked", Icons.Rounded.Delete, Color(0xFFEF4444), hasImg) { vm.runLama() }
                 StudioActionCard("Clear Mask", Icons.Rounded.Clear, Color(0xFF64748B), hasImg) { vm.clearMask() }
                 StudioActionCard("Invert Mask", Icons.Rounded.Refresh, Color(0xFF38BDF8), hasImg) { vm.toggleInvert() }
               }
               Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 4.dp)) {
                 Text("Brush", color = Color(0xFF94A3B8), fontSize = 11.sp)
-                Slider(value = ui.brushRadius, onValueChange = { vm.setBrushRadius(it) }, valueRange = 8f..90f, modifier = Modifier.weight(1f).height(28.dp))
-                Text("${ui.brushRadius.toInt()}", color = Color.White, fontSize = 11.sp)
+                Slider(value = ui.brushSize, onValueChange = { vm.setBrush(it, ui.feather, ui.maskOpacity) }, valueRange = 8f..90f, modifier = Modifier.weight(1f).height(28.dp))
+                Text("${ui.brushSize.toInt()}", color = Color.White, fontSize = 11.sp)
               }
             }
             3 -> Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
               StudioActionCard("Pick Face", Icons.Rounded.Face, Color(0xFF38BDF8), hasImg) { faceLauncher.launch("image/*") }
-              StudioActionCard("Swap Face", Icons.Rounded.Refresh, Color(0xFFA855F7), hasImg && ui.sourceFace != null) { vm.swapFace() }
-              StudioActionCard("HD Face Fix", Icons.Rounded.Star, Color(0xFF10B981), hasImg) { vm.enhanceFaces() }
-              StudioActionCard("4x Upscale", Icons.Rounded.Add, Color(0xFFF59E0B), hasImg) { vm.upscale() }
+              StudioActionCard("Swap Face", Icons.Rounded.Refresh, Color(0xFFA855F7), hasImg && ui.hasSourceFace) { vm.runFacesSwap() }
+              StudioActionCard("HD Face Fix", Icons.Rounded.Star, Color(0xFF10B981), hasImg) { vm.setFaceEnhance(true); vm.runFacesSwap() }
+              StudioActionCard("4x Upscale", Icons.Rounded.Add, Color(0xFFF59E0B), hasImg) { vm.runUpscale() }
             }
             4 -> Column(Modifier.padding(horizontal = 12.dp)) {
               Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                StudioActionCard("Remove BG", Icons.Rounded.Clear, Color(0xFFEC4899), hasImg) { vm.removeBackground() }
-                StudioActionCard("DSLR Bokeh", Icons.Rounded.Search, Color(0xFF6366F1), hasImg) { vm.applyBokeh() }
-                StudioActionCard("Auto Subject", Icons.Rounded.Person, Color(0xFF10B981), hasImg) { vm.autoSegment() }
+                StudioActionCard("Remove BG", Icons.Rounded.Clear, Color(0xFFEC4899), hasImg) { vm.runCutout(0) }
+                StudioActionCard("DSLR Bokeh", Icons.Rounded.Search, Color(0xFF6366F1), hasImg) { vm.setBokeh(0.6f, ui.bokehFocus, ui.bokehRange) }
+                StudioActionCard("Auto Subject", Icons.Rounded.Person, Color(0xFF10B981), hasImg) { vm.runCutout(2) }
                 StudioActionCard("Rotate 90", Icons.Rounded.Refresh, Color(0xFF38BDF8), hasImg) { vm.rotate() }
               }
               Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 4.dp)) {
                 Text("DSLR Blur", color = Color(0xFF94A3B8), fontSize = 11.sp)
-                Slider(value = ui.bokehStrength, onValueChange = { vm.setBokehStrength(it) }, valueRange = 2f..30f, modifier = Modifier.weight(1f).height(28.dp))
-                Text("f/${(32f / ui.bokehStrength).toString().take(3)}", color = Color.White, fontSize = 11.sp)
+                Slider(value = ui.bokehAmount, onValueChange = { vm.setBokeh(it, ui.bokehFocus, ui.bokehRange) }, valueRange = 0f..1f, modifier = Modifier.weight(1f).height(28.dp))
+                Text("${(ui.bokehAmount * 100).toInt()}%", color = Color.White, fontSize = 11.sp)
               }
             }
             5 -> Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
