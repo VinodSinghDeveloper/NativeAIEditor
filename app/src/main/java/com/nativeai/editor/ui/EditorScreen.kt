@@ -145,8 +145,8 @@ fun EditorScreen(vm: AppViewModel) {
             }
             3 -> Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
               StudioActionCard("Pick Face", Icons.Rounded.Face, Color(0xFF38BDF8), hasImg) { faceLauncher.launch("image/*") }
-              StudioActionCard("Swap Face", Icons.Rounded.Refresh, Color(0xFFA855F7), hasImg && ui.hasSourceFace) { vm.runFacesSwap() }
-              StudioActionCard("HD Face Fix", Icons.Rounded.Star, Color(0xFF10B981), hasImg) { vm.setFaceEnhance(true); vm.runFacesSwap() }
+              StudioActionCard("Swap Face", Icons.Rounded.Refresh, Color(0xFFA855F7), hasImg && ui.hasSourceFace) { vm.runFaceSwap() }
+              StudioActionCard("HD Face Fix", Icons.Rounded.Star, Color(0xFF10B981), hasImg) { vm.setFaceEnhance(true); vm.runFaceSwap() }
               StudioActionCard("4x Upscale", Icons.Rounded.Add, Color(0xFFF59E0B), hasImg) { vm.runUpscale() }
             }
             4 -> Column(Modifier.padding(horizontal = 12.dp)) {
