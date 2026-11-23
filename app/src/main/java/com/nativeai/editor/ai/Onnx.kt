@@ -62,19 +62,8 @@ inline fun <R> withRun(file: File, inputs: Map<String, OnnxTensor>, block: (OrtS
     inputs.values.forEach { it.close() }
   }
 
-  fun fixedInputHW(s: ai.onnxruntime.OrtSession): Pair<Int, Int>? {
-    val info = s.inputInfo.values.firstOrNull()?.info as? ai.onnxruntime.TensorInfo ?: return null
-    val sh = info.shape
-    if (sh.size == 4) {
-      val d1 = sh.get(1).toInt(); val d2 = sh.get(2).toInt(); val d3 = sh.get(3).toInt()
-      val nhwc = (d3 == 3 || d3 == 1) && d1 != 3
-      val h = if (nhwc) d1 else d2; val w = if (nhwc) d2 else d3
-      if (h > 0 && w > 0) return h to w
-    }
-    return null
-  }
-  fun isNhwcInput(s: ai.onnxruntime.OrtSession): Boolean {
-    val sh = (s.inputInfo.values.firstOrNull()?.info as? ai.onnxruntime.TensorInfo)?.shape ?: return false
+  fun isNhwcInput(file: java.io.File): Boolean {
+    val sh = (session(file).inputInfo.values.firstOrNull()?.info as? ai.onnxruntime.TensorInfo)?.shape ?: return false
     return sh.size == 4 && (sh.get(3).toInt() == 3 || sh.get(3).toInt() == 1) && sh.get(1).toInt() != 3
   }
   fun readFloatAny(res: ai.onnxruntime.OrtSession.Result): FloatArray {

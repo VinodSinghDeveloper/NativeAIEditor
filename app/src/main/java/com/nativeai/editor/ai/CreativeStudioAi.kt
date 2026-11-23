@@ -14,8 +14,8 @@ object CreativeStudioAi {
 
   fun runStyleOnnx(src: Bitmap, modelFile: File): Bitmap {
     val sess = Ort.session(modelFile)
-    val fixed = Ort.fixedInputHW(sess)
-    val nhwc = Ort.isNhwcInput(sess)
+    val fixed = Ort.fixedInputHW(modelFile)
+    val nhwc = Ort.isNhwcInput(modelFile)
     val w = src.width; val h = src.height
     val scale = if (max(w, h) > 768) 768f / max(w, h) else 1f
     val sw = fixed?.second ?: max(32, ((w * scale).roundToInt() / 32) * 32)
@@ -83,7 +83,7 @@ object CreativeStudioAi {
       return Bitmap.createBitmap(src.width, src.height, Bitmap.Config.ARGB_8888).also { Utils.matToBitmap(rgba, it) }
     }
     val sess = Ort.session(modelFile)
-    val fixed = Ort.fixedInputHW(sess) ?: (256 to 256)
+    val fixed = Ort.fixedInputHW(modelFile) ?: (256 to 256)
     val sh = fixed.first; val sw = fixed.second
     val scaled = Bitmap.createScaledBitmap(src, sw, sh, true)
     val px = IntArray(sw * sh); scaled.getPixels(px, 0, sw, 0, 0, sw, sh)
@@ -138,10 +138,12 @@ object CreativeStudioAi {
       if (if (keepMainSubject) (l > 0 && l != mainLabel) else (l > 0)) { erasePx.set(i, Color.argb(255, 255, 59, 48)); found = true }
     }
     if (!found) return src
-    val eBmp = intsToBitmap(erasePx, w, h); val eMat = Mat(); Utils.bitmapToMat(eBmp, eMat)
+    val eMat = Mat(h, w, CvType.CV_8UC1)
+    val eBytes = ByteArray(w * h) { i -> if (erasePx.get(i) != 0) 255.toByte() else 0 }
+    eMat.put(0, 0, eBytes)
     Imgproc.dilate(eMat, eMat, Imgproc.getStructuringElement(Imgproc.MORPH_ELLIPSE, Size(15.0, 15.0)))
-    Utils.matToBitmap(eMat, eBmp)
-    return Lama.inpaint(src, eBmp, lamaFile)
+    eMat.get(0, 0, eBytes)
+    return Lama.inpaint(src, eBytes, false, lamaFile) {}
   }
 
   fun applyPreset(src: Bitmap, preset: String): Bitmap {
