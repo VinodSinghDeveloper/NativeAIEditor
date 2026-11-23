@@ -66,10 +66,7 @@ inline fun <R> withRun(file: File, inputs: Map<String, OnnxTensor>, block: (OrtS
     val sh = (session(file).inputInfo.values.firstOrNull()?.info as? ai.onnxruntime.TensorInfo)?.shape ?: return false
     return sh.size == 4 && (sh.get(3).toInt() == 3 || sh.get(3).toInt() == 1) && sh.get(1).toInt() != 3
   }
-  fun readFloatAny(res: ai.onnxruntime.OrtSession.Result): FloatArray {
-    val t = res.get(0) as ai.onnxruntime.OnnxTensor
-    val fb = t.floatBuffer
-    return FloatArray(fb.remaining()).also { fb.get(it) }
-  }
+  fun readFloatAny(res: ai.onnxruntime.OrtSession.Result): FloatArray =
+    readFloat(firstTensor(res))
 
 }
