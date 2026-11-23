@@ -35,7 +35,7 @@ object CreativeStudioAi {
     val inName = sess.inputNames.first()
     val t = Ort.fTensor(shape, buf)
     val res = sess.run(mapOf(inName to t))
-    val raw = Ort.readFloat(Ort.firstTensor(res))
+    val raw = Ort.readFloatAny(res)
     res.close(); t.close()
     val outPx = IntArray(hw)
     for (i in 0 until hw) {
@@ -96,7 +96,7 @@ object CreativeStudioAi {
     val inName = sess.inputNames.first()
     val t = Ort.fTensor(longArrayOf(1, 3, sh.toLong(), sw.toLong()), buf)
     val res = sess.run(mapOf(inName to t))
-    val raw = Ort.readFloat(Ort.firstTensor(res))
+    val raw = Ort.readFloatAny(res)
     res.close(); t.close()
     val mult = if ((raw.maxOrNull() ?: 1f) <= 2f) 255f else 1f
     val outPx = IntArray(hw)
@@ -115,9 +115,7 @@ object CreativeStudioAi {
     val lab = Mat(); Imgproc.cvtColor(healed, lab, Imgproc.COLOR_BGR2Lab)
     val ch = mutableListOf<Mat>(); Core.split(lab, ch); Imgproc.createCLAHE(1.8, Size(8.0, 8.0)).apply(ch.get(0), ch.get(0))
     Core.merge(ch, lab); Imgproc.cvtColor(lab, healed, Imgproc.COLOR_Lab2BGR); Imgproc.cvtColor(healed, rgba, Imgproc.COLOR_BGR2RGBA)
-    var res = Bitmap.createBitmap(src.width, src.height, Bitmap.Config.ARGB_8888).also { Utils.matToBitmap(rgba, it) }
-    if (gfpganFile != null && gfpganFile.exists() && detFile != null && detFile.exists()) res = FaceSwap.enhanceFaces(res, detFile, gfpganFile)
-    return res
+    return Bitmap.createBitmap(src.width, src.height, Bitmap.Config.ARGB_8888).also { Utils.matToBitmap(rgba, it) }
   }
 
   fun autoRemoveCrowd(src: Bitmap, segFile: File, lamaFile: File, keepMainSubject: Boolean = true): Bitmap {
@@ -149,7 +147,7 @@ object CreativeStudioAi {
   fun applyPreset(src: Bitmap, preset: String): Bitmap {
     if (preset == "Original") return src
     val rgba = Mat(); Utils.bitmapToMat(src, rgba); val bgr = Mat(); Imgproc.cvtColor(rgba, bgr, Imgproc.COLOR_RGBA2BGR)
-
+    val f = Mat(); bgr.convertTo(f, CvType.CV_32FC3, 1.0 / 255.0); val ch = mutableListOf<Mat>(); Core.split(f, ch)
     when (preset) {
       "Teal & Orange" -> { Core.multiply(ch.get(2), Scalar(1.12), ch.get(2)); Core.multiply(ch.get(0), Scalar(1.08), ch.get(0)); Core.subtract(ch.get(1), Scalar(0.03), ch.get(1)) }
       "Kodak Gold 200" -> { Core.multiply(ch.get(2), Scalar(1.15), ch.get(2)); Core.multiply(ch.get(1), Scalar(1.06), ch.get(1)); Core.multiply(ch.get(0), Scalar(0.88), ch.get(0)) }
