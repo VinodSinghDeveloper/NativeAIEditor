@@ -61,12 +61,8 @@ inline fun <R> withRun(file: File, inputs: Map<String, OnnxTensor>, block: (OrtS
     res.close()
     inputs.values.forEach { it.close() }
   }
-
-  fun isNhwcInput(file: java.io.File): Boolean {
-    val sh = (session(file).inputInfo.values.firstOrNull()?.info as? ai.onnxruntime.TensorInfo)?.shape ?: return false
-    return sh.size == 4 && (sh.get(3).toInt() == 3 || sh.get(3).toInt() == 1) && sh.get(1).toInt() != 3
-  }
-  fun readFloatAny(res: ai.onnxruntime.OrtSession.Result): FloatArray =
-    readFloat(firstTensor(res))
-
 }
+
+fun firstTensor(res: OrtSession.Result): OnnxTensor = res.get(0) as OnnxTensor
+
+fun copyOut(t: OnnxTensor): OnnxTensor = Ort.fTensor(t.info.shape, readFloat(t))
