@@ -35,7 +35,7 @@ fun EditorScreen(vm: AppViewModel) {
   LaunchedEffect(ui.message) { ui.message?.let { snackbar.showSnackbar(it); vm.clearMessage() } }
   if (ui.showModels) { ModelManagerScreen(vm); return }
 
-  if (ui.showFirstRun) {
+  if (false && ui.showFirstRun) {
     val coreMB = ModelCatalog.core.sumOf { it.approxMB }
     AlertDialog(
       onDismissRequest = { vm.skipFirstRun() },
