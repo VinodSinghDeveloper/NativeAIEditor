@@ -11,10 +11,11 @@ object Lama {
     val w = base.width; val h = base.height
     val eff = ByteArray(alpha.size) { val a = alpha[it].toInt() and 0xFF; (if (inverted) 255 - a else a).toByte() }
     onProgress(0.1f)
+    val fixed = Ort.fixedInputHW(model)
     val long = max(w, h)
     val s = if (long > 1280) 1280f / long else 1f
-    val sw = max(8, ((w * s).roundToInt() / 8) * 8)
-    val sh = max(8, ((h * s).roundToInt() / 8) * 8)
+    val sw = fixed?.second ?: max(8, ((w * s).roundToInt() / 8) * 8)
+    val sh = fixed?.first ?: max(8, ((h * s).roundToInt() / 8) * 8)
     val scaled = Bitmap.createScaledBitmap(base, sw, sh, true)
     val img = rgbFloatNCHW(scaled, sw, sh, floatArrayOf(0f, 0f, 0f), floatArrayOf(1f, 1f, 1f))
     val maskSmall = Bitmap.createScaledBitmap(alphaToMask(eff, w, h), sw, sh, true)
