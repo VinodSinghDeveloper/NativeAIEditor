@@ -32,6 +32,16 @@ fun EditorScreen(vm: AppViewModel) {
   val openLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? -> uri?.let { vm.loadPhoto(it) } }
   val faceLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? -> uri?.let { vm.setSourceFace(it) } }
 
+  LaunchedEffect(Unit) {
+    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+      val needed = ModelCatalog.all.filter { !it.id.startsWith("sd_") }
+      for (m in needed) {
+        if (!vm.downloader.file(m.id).exists()) {
+          runCatching { vm.downloader.download(m.id) }
+        }
+      }
+    }
+  }
   LaunchedEffect(ui.message) { ui.message?.let { snackbar.showSnackbar(it); vm.clearMessage() } }
   if (ui.showModels) { ModelManagerScreen(vm); return }
 

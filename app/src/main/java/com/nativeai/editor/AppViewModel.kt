@@ -69,16 +69,7 @@ data class UiState(
 )
 
 class AppViewModel(app: Application) : AndroidViewModel(app) {
-  init {
-    viewModelScope.launch(Dispatchers.IO) {
-      val needed = com.nativeai.editor.ai.ModelCatalog.all.filter { !it.id.startsWith("sd_") }
-      for (m in needed) {
-        if (!downloader.file(m.id).exists()) {
-          runCatching { downloader.download(m.id) }
-        }
-      }
-    }
-  }
+
 
   var ui by mutableStateOf(UiState())
     private set
