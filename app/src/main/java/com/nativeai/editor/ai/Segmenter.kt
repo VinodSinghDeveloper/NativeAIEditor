@@ -27,6 +27,14 @@ object Segmenter {
     val full = Bitmap.createScaledBitmap(alphaSmall, base.width, base.height, true)
     val alpha = maskAlpha(full)
     alphaSmall.recycle(); full.recycle()
+        val w = base.width; val h = base.height
+    var cSum = 0L; var cCnt = 0
+    for (y in h/3 until 2*h/3) for (x in w/3 until 2*w/3) { cSum += (alpha.get(y*w+x).toInt() and 255); cCnt++ }
+    var bSum = 0L; var bCnt = 0
+    for (x in 0 until w) { bSum += (alpha.get(x).toInt() and 255) + (alpha.get((h-1)*w+x).toInt() and 255); bCnt += 2 }
+    if (cCnt > 0 && bCnt > 0 && (cSum / cCnt) + 25 < (bSum / bCnt)) {
+      for (i in alpha.indices) alpha.set(i, (255 - (alpha.get(i).toInt() and 255)).toByte())
+    }
     return alpha
   }
 }
